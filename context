@@ -3,12 +3,23 @@ import os
 import sys
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: context <file_extension>")
-        print("       context \"ext1 ext2 ...\"")
+    show_path = False
+
+    if len(sys.argv) < 2:
+        print("Usage: context [-p] <file_extension>")
+        print("       context [-p] \"ext1 ext2 ...\"")
         sys.exit(1)
 
-    raw_extensions = sys.argv[1].split()
+    if sys.argv[1] == "-p":
+        show_path = True
+        if len(sys.argv) < 3:
+            print("Missing extensions after -p")
+            sys.exit(1)
+        extensions_arg = sys.argv[2]
+    else:
+        extensions_arg = sys.argv[1]
+
+    raw_extensions = extensions_arg.split()
     if not raw_extensions:
         print("No extensions provided.")
         sys.exit(1)
@@ -29,7 +40,10 @@ def main():
                     path = os.path.join(root, file)
                     try:
                         with open(path, 'r', encoding='utf-8') as in_f:
+                            if show_path:
+                                out_f.write(f'"{path}"\n')
                             out_f.write(in_f.read())
+                            out_f.write('\n')  # oddzielenie plików
                     except Exception as e:
                         print(f"Error reading {path}: {e}", file=sys.stderr)
 
