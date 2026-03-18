@@ -4,24 +4,38 @@ import sys
 
 def main():
     show_path = False
+    search_dir = '.'
 
-    if len(sys.argv) < 2:
-        print("Usage: context [-p] <file_extension>")
-        print("       context [-p] \"ext1 ext2 ...\"")
+    args = sys.argv[1:]
+    i = 0
+    ext_parts = []
+    while i < len(args):
+        arg = args[i]
+        if arg == '-p':
+            show_path = True
+            i += 1
+        elif arg == '-d':
+            if i + 1 >= len(args):
+                print("Missing path after -d", file=sys.stderr)
+                sys.exit(1)
+            search_dir = args[i + 1]
+            i += 2
+        elif arg.startswith('-'):
+            print(f"Unknown option: {arg}", file=sys.stderr)
+            sys.exit(1)
+        else:
+            ext_parts = args[i:]
+            break
+
+    if not ext_parts:
+        print("Usage: context [-p] [-d <directory>] <extensions>")
+        print("       context [-p] [-d <directory>] \"ext1 ext2 ...\"")
         sys.exit(1)
 
-    if sys.argv[1] == "-p":
-        show_path = True
-        if len(sys.argv) < 3:
-            print("Missing extensions after -p")
-            sys.exit(1)
-        extensions_arg = sys.argv[2]
-    else:
-        extensions_arg = sys.argv[1]
-
+    extensions_arg = ' '.join(ext_parts)
     raw_extensions = extensions_arg.split()
     if not raw_extensions:
-        print("No extensions provided.")
+        print("No extensions provided.", file=sys.stderr)
         sys.exit(1)
 
     extensions = []
@@ -33,19 +47,23 @@ def main():
 
     output_file = "output.txt"
 
-    with open(output_file, 'w', encoding='utf-8') as out_f:
-        for root, dirs, files in os.walk('.'):
-            for file in files:
-                if any(file.endswith(ext) for ext in extensions):
-                    path = os.path.join(root, file)
-                    try:
-                        with open(path, 'r', encoding='utf-8') as in_f:
-                            if show_path:
-                                out_f.write(f'"{path}"\n')
-                            out_f.write(in_f.read())
-                            out_f.write('\n')  # oddzielenie plików
-                    except Exception as e:
-                        print(f"Error reading {path}: {e}", file=sys.stderr)
+    try:
+        with open(output_file, 'w', encoding='utf-8') as out_f:
+            for root, dirs, files in os.walk(search_dir):
+                for file in files:
+                    if any(file.endswith(ext) for ext in extensions):
+                        path = os.path.join(root, file)
+                        try:
+                            with open(path, 'r', encoding='utf-8') as in_f:
+                                if show_path:
+                                    out_f.write(f'"{path}"\n')
+                                out_f.write(in_f.read())
+                                out_f.write('\n')
+                        except Exception as e:
+                            print(f"Error reading {path}: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Error while processing directory {search_dir}: {e}", file=sys.stderr)
+        sys.exit(1)
 
     ext_str = ', '.join(raw_extensions)
     print(f"Content of files ({ext_str}) saved to {output_file}.")
