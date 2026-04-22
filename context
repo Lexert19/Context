@@ -45,7 +45,13 @@ def main():
             e = '.' + e
         extensions.append(e)
 
-    output_file = "output.txt"
+    output_filename = "output.txt"
+    idea_dir = os.path.join(os.getcwd(), '.idea')
+    
+    if os.path.isdir(idea_dir):
+        output_file = os.path.join(idea_dir, output_filename)
+    else:
+        output_file = output_filename
 
     try:
         with open(output_file, 'w', encoding='utf-8') as out_f:
