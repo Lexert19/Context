@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 import os
 import sys
+import subprocess
+
+def get_base_branch():
+    branches_to_try = ['origin/main', 'origin/master', 'main', 'master']
+    for branch in branches_to_try:
+        try:
+            subprocess.run(['git', 'rev-parse', '--verify', branch], capture_output=True, check=True)
+            return branch
+        except subprocess.CalledProcessError:
+            continue
+    return None
 
 def main():
     show_path = False
     search_dir = '.'
+    review_mode = False
 
     args = sys.argv[1:]
     i = 0
@@ -13,6 +25,9 @@ def main():
         arg = args[i]
         if arg == '-p':
             show_path = True
+            i += 1
+        elif arg == '--review':
+            review_mode = True
             i += 1
         elif arg == '-d':
             if i + 1 >= len(args):
@@ -27,23 +42,20 @@ def main():
             ext_parts = args[i:]
             break
 
-    if not ext_parts:
-        print("Usage: context [-p] [-d <directory>] <extensions>")
-        print("       context [-p] [-d <directory>] \"ext1 ext2 ...\"")
-        sys.exit(1)
-
-    extensions_arg = ' '.join(ext_parts)
-    raw_extensions = extensions_arg.split()
-    if not raw_extensions:
-        print("No extensions provided.", file=sys.stderr)
+    if not ext_parts and not review_mode:
+        print("Usage: context [-p] [-d <directory>] [--review] <extensions>")
+        print("       context [-p] [-d <directory>] [--review] \"ext1 ext2 ...\"")
         sys.exit(1)
 
     extensions = []
-    for e in raw_extensions:
-        e = e.strip()
-        if not e.startswith('.'):
-            e = '.' + e
-        extensions.append(e)
+    if ext_parts:
+        extensions_arg = ' '.join(ext_parts)
+        raw_extensions = extensions_arg.split()
+        for e in raw_extensions:
+            e = e.strip()
+            if not e.startswith('.'):
+                e = '.' + e
+            extensions.append(e)
 
     output_filename = "output.txt"
     idea_dir = os.path.join(os.getcwd(), '.idea')
@@ -55,24 +67,77 @@ def main():
 
     try:
         with open(output_file, 'w', encoding='utf-8') as out_f:
-            for root, dirs, files in os.walk(search_dir):
-                for file in files:
-                    if any(file.endswith(ext) for ext in extensions):
-                        path = os.path.join(root, file)
+            
+            if review_mode:
+                base_branch = get_base_branch()
+                if not base_branch:
+                    print("Error: Could not find 'origin/main', 'origin/master', 'main', or 'master' branch.", file=sys.stderr)
+                    sys.exit(1)
+
+                diff_target = f"{base_branch}...HEAD"
+                print(f"Running in --review mode (comparing {diff_target})...")
+                
+                try:
+                    name_cmd = ['git', '--no-pager', 'diff', '--name-only', '--diff-filter=d', diff_target]
+                    name_result = subprocess.run(name_cmd, capture_output=True, text=True, check=True)
+                    
+                    changed_files = name_result.stdout.strip().split('\n')
+                    
+                    out_f.write("========== EDITED FILES FULL CONTENT ==========\n\n")
+                    
+                    files_processed = 0
+                    for file_path in changed_files:
+                        if not file_path:
+                            continue
+                        
+                        if extensions and not any(file_path.endswith(ext) for ext in extensions):
+                            continue
+                        
                         try:
-                            with open(path, 'r', encoding='utf-8') as in_f:
-                                if show_path:
-                                    out_f.write(f'"{path}"\n')
+                            with open(file_path, 'r', encoding='utf-8') as in_f:
+                                out_f.write(f'--- FILE: "{file_path}" ---\n')
                                 out_f.write(in_f.read())
-                                out_f.write('\n')
+                                out_f.write('\n\n')
+                                files_processed += 1
                         except Exception as e:
-                            print(f"Error reading {path}: {e}", file=sys.stderr)
+                            print(f"Error reading {file_path}: {e}", file=sys.stderr)
+
+                    diff_cmd = ['git', '--no-pager', 'diff', diff_target]
+                    diff_result = subprocess.run(diff_cmd, capture_output=True, text=True, check=True)
+                    
+                    out_f.write("========== SUMMARY: GIT DIFF ==========\n\n")
+                    out_f.write(diff_result.stdout)
+                    out_f.write("\n")
+                    
+                    print(f"Processed {files_processed} files and added git diff summary.")
+                            
+                except subprocess.CalledProcessError as e:
+                    print(f"Git command failed.\nError: {e}", file=sys.stderr)
+                    sys.exit(1)
+
+            else:
+                for root, dirs, files in os.walk(search_dir):
+                    for file in files:
+                        if any(file.endswith(ext) for ext in extensions):
+                            path = os.path.join(root, file)
+                            try:
+                                with open(path, 'r', encoding='utf-8') as in_f:
+                                    if show_path:
+                                        out_f.write(f'"{path}"\n')
+                                    out_f.write(in_f.read())
+                                    out_f.write('\n')
+                            except Exception as e:
+                                print(f"Error reading {path}: {e}", file=sys.stderr)
+                                
     except Exception as e:
-        print(f"Error while processing directory {search_dir}: {e}", file=sys.stderr)
+        print(f"Error while processing: {e}", file=sys.stderr)
         sys.exit(1)
 
-    ext_str = ', '.join(raw_extensions)
-    print(f"Content of files ({ext_str}) saved to {output_file}.")
+    if review_mode:
+        print(f"Output saved to {output_file}.")
+    else:
+        ext_str = ', '.join(raw_extensions) if ext_parts else "all"
+        print(f"Content of files ({ext_str}) saved to {output_file}.")
 
 if __name__ == "__main__":
     main()
