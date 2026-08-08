@@ -1,0 +1,1 @@
+go build -o /home/lexert/bin/context .

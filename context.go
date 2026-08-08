@@ -13,7 +13,7 @@ import (
 )
 
 func getBaseBranch() string {
-	branches := []string{"origin/main", "origin/master", "main", "master"}
+	branches := []string{"main", "master", "origin/main", "origin/master"}
 	for _, branch := range branches {
 		cmd := exec.Command("git", "rev-parse", "--verify", branch)
 		if err := cmd.Run(); err == nil {
