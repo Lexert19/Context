@@ -74,14 +74,18 @@ func appendFileContent(w io.Writer, path string) error {
 	return err
 }
 
-func runReviewMode(out *bufio.Writer, extensions []string) error {
+func runGitMode(out *bufio.Writer, extensions []string, includeDiff bool) error {
 	baseBranch := getBaseBranch()
 	if baseBranch == "" {
 		return fmt.Errorf("could not find 'origin/main', 'origin/master', 'main', or 'master' branch")
 	}
 
 	diffTarget := fmt.Sprintf("%s...HEAD", baseBranch)
-	fmt.Printf("Review mode: comparing with %s...\n", diffTarget)
+	if includeDiff {
+		fmt.Printf("Review mode: comparing with %s...\n", diffTarget)
+	} else {
+		fmt.Printf("Changed files mode: comparing with %s...\n", diffTarget)
+	}
 
 	nameCmd := exec.Command("git", "--no-pager", "diff", "--name-only", "--diff-filter=d", diffTarget)
 	outBytes, err := nameCmd.Output()
@@ -112,17 +116,22 @@ func runReviewMode(out *bufio.Writer, extensions []string) error {
 		processed++
 	}
 
-	diffCmd := exec.Command("git", "--no-pager", "diff", diffTarget)
-	diffOut, err := diffCmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to run git diff: %w", err)
+	if includeDiff {
+		diffCmd := exec.Command("git", "--no-pager", "diff", diffTarget)
+		diffOut, err := diffCmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to run git diff: %w", err)
+		}
+
+		out.WriteString("========== SUMMARY: GIT DIFF ==========\n\n")
+		out.Write(diffOut)
+		out.WriteString("\n")
+
+		fmt.Printf("Processed %d files and added git diff summary.\n", processed)
+	} else {
+		fmt.Printf("Processed %d changed files.\n", processed)
 	}
 
-	out.WriteString("========== SUMMARY: GIT DIFF ==========\n\n")
-	out.Write(diffOut)
-	out.WriteString("\n")
-
-	fmt.Printf("Processed %d files and added git diff summary.\n", processed)
 	return nil
 }
 
@@ -132,6 +141,7 @@ func main() {
 	var pathHeader bool
 	var listOnly bool
 	var reviewMode bool
+	var changedOnlyMode bool
 
 	flag.StringVar(&searchDir, "d", ".", "Search directory")
 	flag.StringVar(&searchDir, "dir", ".", "Search directory")
@@ -148,12 +158,15 @@ func main() {
 	flag.BoolVar(&reviewMode, "r", false, "Run in git review mode comparing HEAD against main/master")
 	flag.BoolVar(&reviewMode, "review", false, "Run in git review mode comparing HEAD against main/master")
 
+	flag.BoolVar(&changedOnlyMode, "c", false, "Dump content of changed files only (without git diff summary)")
+	flag.BoolVar(&changedOnlyMode, "changed", false, "Dump content of changed files only (without git diff summary)")
+
 	flag.Parse()
 
 	rawExtensions := flag.Args()
 
-	if len(rawExtensions) == 0 && !reviewMode {
-		fmt.Fprintln(os.Stderr, "Error: At least one file extension or --review flag must be specified.")
+	if len(rawExtensions) == 0 && !reviewMode && !changedOnlyMode {
+		fmt.Fprintln(os.Stderr, "Error: At least one file extension, --review, or --changed flag must be specified.")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -176,8 +189,8 @@ func main() {
 	bufWriter := bufio.NewWriterSize(outFile, 64*1024)
 	defer bufWriter.Flush()
 
-	if reviewMode {
-		if err := runReviewMode(bufWriter, extensions); err != nil {
+	if reviewMode || changedOnlyMode {
+		if err := runGitMode(bufWriter, extensions, reviewMode); err != nil {
 			fmt.Fprintf(os.Stderr, "Fatal error: %v\n", err)
 			os.Exit(1)
 		}
