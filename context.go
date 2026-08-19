@@ -161,6 +161,9 @@ func main() {
 	flag.BoolVar(&changedOnlyMode, "c", false, "Dump content of changed files only (without git diff summary)")
 	flag.BoolVar(&changedOnlyMode, "changed", false, "Dump content of changed files only (without git diff summary)")
 
+	var appendReviewFlag appendReviewFlag
+	flag.Var(&appendReviewFlag, "append-review", "Append all reviews (if no value) or a specific review")
+
 	flag.Parse()
 
 	rawExtensions := flag.Args()
@@ -188,6 +191,11 @@ func main() {
 
 	bufWriter := bufio.NewWriterSize(outFile, 64*1024)
 	defer bufWriter.Flush()
+
+	reviewDir := filepath.Join(".idea", "review")
+	if err := appendReviewIfNeeded(bufWriter, appendReviewFlag, reviewDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
 
 	if reviewMode || changedOnlyMode {
 		if err := runGitMode(bufWriter, extensions, reviewMode); err != nil {
