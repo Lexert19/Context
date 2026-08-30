@@ -1,4 +1,4 @@
-package main
+package review
 
 import (
 	"bufio"
@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-type appendReviewFlag struct {
+type AppendReviewFlag struct {
 	value string
 	set   bool
 }
 
-func (a *appendReviewFlag) String() string {
+func (a *AppendReviewFlag) String() string {
 	return a.value
 }
 
-func (a *appendReviewFlag) Set(s string) error {
+func (a *AppendReviewFlag) Set(s string) error {
 	a.value = s
 	a.set = true
 	return nil
@@ -67,7 +67,7 @@ func readReviewFile(path string) (string, error) {
 	return string(content), nil
 }
 
-func appendReviewIfNeeded(w *bufio.Writer, appendReviewFlag appendReviewFlag, reviewDir string) error {
+func AppendReviewIfNeeded(w *bufio.Writer, appendReviewFlag AppendReviewFlag, reviewDir string) error {
 	if !appendReviewFlag.set {
 		return nil
 	}
