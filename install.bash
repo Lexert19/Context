@@ -1,1 +1,1 @@
-go build -o /home/lexert/bin/context .
+go build -o /home/lexert/bin/context ./cmd/context
