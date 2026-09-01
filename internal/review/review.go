@@ -8,90 +8,67 @@ import (
 	"strings"
 )
 
-type AppendReviewFlag struct {
-	value string
-	set   bool
-}
-
-func (a *AppendReviewFlag) String() string {
-	return a.value
-}
-
-func (a *AppendReviewFlag) Set(s string) error {
-	a.value = s
-	a.set = true
-	return nil
-}
-
-func getAllReviews(reviewDir string) (string, error) {
-	entries, err := os.ReadDir(reviewDir)
+func Append(w *bufio.Writer, target, reviewDir string) error {
+	content, err := resolveContent(target, reviewDir)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to read review: %w", err)
 	}
 
-	var result strings.Builder
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".txt") {
-			continue
-		}
-		path := filepath.Join(reviewDir, name)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		result.WriteString(fmt.Sprintf("=== REVIEW: %s ===\n", name))
-		result.Write(content)
-		result.WriteString("\n\n")
-	}
-	return result.String(), nil
-}
-
-func getReviewFile(reviewDir, filename string) (string, error) {
-	fullPath := filepath.Join(reviewDir, filename)
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}
-
-func readReviewFile(path string) (string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}
-
-func AppendReviewIfNeeded(w *bufio.Writer, appendReviewFlag AppendReviewFlag, reviewDir string) error {
-	if !appendReviewFlag.set {
+	if content == "" {
 		return nil
 	}
 
-	var reviewText string
-	var err error
-	value := appendReviewFlag.value
-
-	if value == "" {
-		reviewText, err = getAllReviews(reviewDir)
-	} else if strings.Contains(value, "/") || strings.Contains(value, "\\") {
-		reviewText, err = readReviewFile(value)
-	} else {
-		reviewText, err = getReviewFile(reviewDir, value)
-	}
-
-	if err != nil {
-		return fmt.Errorf("could not read review: %w", err)
-	}
-
-	if reviewText != "" {
-		w.WriteString("========== PREVIOUS REVIEWS ==========\n\n")
-		w.WriteString(reviewText)
-		w.WriteString("\n=====================================\n\n")
-	}
+	w.WriteString("========== PREVIOUS REVIEWS ==========\n\n")
+	w.WriteString(content)
+	w.WriteString("\n=====================================\n\n")
 	return nil
+}
+
+func resolveContent(target, reviewDir string) (string, error) {
+	if target == "" {
+		return readAllFromDir(reviewDir)
+	}
+
+	if strings.Contains(target, "/") || strings.Contains(target, "\\") {
+		return readFile(target)
+	}
+
+	return readFile(filepath.Join(reviewDir, target))
+}
+
+func readFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func readAllFromDir(dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	var sb strings.Builder
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+
+		sb.WriteString(fmt.Sprintf("=== REVIEW: %s ===\n", entry.Name()))
+		sb.Write(data)
+		sb.WriteString("\n\n")
+	}
+
+	return sb.String(), nil
 }
