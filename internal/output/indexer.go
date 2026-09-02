@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type WordStat struct {
@@ -16,14 +18,65 @@ type WordStat struct {
 	Weight float64 `json:"weight"`
 }
 
-type FileIndex struct {
+type FileIndexJSON struct {
 	TotalTokens  int        `json:"total_tokens"`
 	UniqueTokens int        `json:"unique_tokens"`
 	Words        []WordStat `json:"words"`
 }
 
+func BuildWordIndexProto(filePaths []string, targetPath string) error {
+	files := make([]string, 0, len(filePaths))
+	fileId := make(map[string]int)
+
+	idx := make(map[string]*PostingList)
+
+	for _, path := range filePaths {
+		content, _ := os.ReadFile(path)
+		tokens := tokenize(string(content))
+		if len(tokens) == 0 {
+			continue
+		}
+
+		p := filepath.ToSlash(path)
+		if _, ok := fileId[p]; !ok {
+			fileId[p] = len(files)
+			files = append(files, p)
+		}
+		id := fileId[p]
+
+		counts := map[string]int{}
+		for _, t := range tokens {
+			counts[t]++
+		}
+
+		for w, c := range counts {
+			pl, ok := idx[w]
+			if !ok {
+				pl = &PostingList{}
+				idx[w] = pl
+			}
+			pl.Postings = append(pl.Postings, &Posting{
+				FileId: uint32(id),
+				Count:  uint32(c),
+			})
+		}
+	}
+
+	out := &InvertedIndex{
+		Files: files,
+		Index: idx,
+	}
+
+	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(out)
+	if err != nil {
+		return err
+	}
+	_ = os.MkdirAll(filepath.Dir(targetPath), 0755)
+	return os.WriteFile(targetPath, data, 0644)
+}
+
 func BuildWordIndex(filePaths []string, targetPath string) error {
-	index := make(map[string]FileIndex)
+	index := make(map[string]FileIndexJSON)
 
 	for _, path := range filePaths {
 		content, err := os.ReadFile(path)
@@ -60,7 +113,7 @@ func BuildWordIndex(filePaths []string, targetPath string) error {
 		})
 
 		normalizedPath := filepath.ToSlash(path)
-		index[normalizedPath] = FileIndex{
+		index[normalizedPath] = FileIndexJSON{
 			TotalTokens:  total,
 			UniqueTokens: len(stats),
 			Words:        stats,

@@ -1,0 +1,27 @@
+syntax = "proto3";
+package output;
+option go_package = "mycontext/internal/output;output";
+
+message Posting {
+  uint32 file_id = 1;
+  uint32 count = 2;
+}
+
+message PostingList {
+  repeated Posting postings = 1;
+}
+
+message InvertedIndex {
+  repeated string files = 1;
+  map<string, PostingList> index = 2;
+}
+
+message FileEntry {
+  string path = 1;
+  uint32 total = 2;
+  map<string, uint32> words = 3;
+}
+
+message FileIndex {
+  repeated FileEntry files = 1;
+}
