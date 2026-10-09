@@ -12,6 +12,8 @@ type Config struct {
 	SearchDir    string
 	OutputFile   string
 	FromPath     string
+	FromIndex    []string
+	IndexPath    string
 	ReviewMode   bool
 	ChangedMode  bool
 	ListOnly     bool
@@ -36,6 +38,19 @@ func Parse() (*Config, error) {
 	bindBool(fs, &cfg.ReviewMode, false, "r", "review")
 	bindBool(fs, &cfg.ChangedMode, false, "c", "changed")
 	bindBool(fs, &cfg.IndexWords, false, "index-words")
+
+	cfg.IndexPath = filepath.Join(".idea", "word_index.json")
+
+	fs.Func("from-index", "comma-separated words; outputs files indexed with these words", func(s string) error {
+		for _, w := range strings.Split(s, ",") {
+			w = strings.TrimSpace(w)
+			if w != "" {
+				cfg.FromIndex = append(cfg.FromIndex, strings.ToLower(w))
+			}
+		}
+		return nil
+	})
+	fs.StringVar(&cfg.IndexPath, "index-path", cfg.IndexPath, "")
 
 	fs.Func("append-review", "", func(s string) error {
 		cfg.AppendReview = true
@@ -89,12 +104,16 @@ OPTIONS:
   --append-review [file]   Append review notes from .idea/review (or specified file)
   --index-words            Build unique words index into .idea/word_index.json
   -h, --help               Show this help message
+  --from-index "w1, w2, ..."  Output files that contain any of these indexed words
+                              (uses .idea/word_index.json, sorted by relevance)
+  --index-path <path>         Override index location (default .idea/word_index.json)
 
 EXAMPLES:
-  mycontext .go .sql
-  mycontext -r
-  mycontext -F
-  mycontext --index-words .go
+  context .go .sql
+  context -r
+  context -F
+  context --index-words .go
+  context --from-index "authentication, auth"
 `)
 	}
 }

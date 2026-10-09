@@ -27,11 +27,15 @@ func Resolve(cfg *config.Config) Source {
 		condition bool
 		create    func() Source
 	}{
-		{cfg.ReviewMode || cfg.ChangedMode, func() Source { return NewGitSource(cfg.Extensions) }},
-		{cfg.FromPath != "", func() Source { return NewListSource(cfg.FromPath, cfg.Extensions) }},
-		{true, func() Source { return NewDirSource(cfg.SearchDir, cfg.Extensions) }},
+		{cfg.ReviewMode || cfg.ChangedMode,
+			func() Source { return NewGitSource(cfg.Extensions) }},
+		{len(cfg.FromIndex) > 0,
+			func() Source { return NewIndexSource(cfg.FromIndex, cfg.IndexPath, cfg.Extensions) }},
+		{cfg.FromPath != "",
+			func() Source { return NewListSource(cfg.FromPath, cfg.Extensions) }},
+		{true,
+			func() Source { return NewDirSource(cfg.SearchDir, cfg.Extensions) }},
 	}
-
 	for _, s := range strategies {
 		if s.condition {
 			return s.create()
