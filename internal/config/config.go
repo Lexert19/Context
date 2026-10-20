@@ -26,7 +26,7 @@ type Config struct {
 
 func Parse() (*Config, error) {
 	cfg := &Config{}
-	fs := flag.NewFlagSet("mycontext", flag.ExitOnError)
+	fs := flag.NewFlagSet("context", flag.ExitOnError)
 
 	fs.Usage = printHelp(fs)
 
@@ -39,7 +39,7 @@ func Parse() (*Config, error) {
 	bindBool(fs, &cfg.ChangedMode, false, "c", "changed")
 	bindBool(fs, &cfg.IndexWords, false, "index-words")
 
-	cfg.IndexPath = filepath.Join(".idea", "word_index.json")
+	cfg.IndexPath = filepath.Join(".idea", "word_index.pb")
 
 	fs.Func("from-index", "comma-separated words; outputs files indexed with these words", func(s string) error {
 		for _, w := range strings.Split(s, ",") {
@@ -85,10 +85,10 @@ func Parse() (*Config, error) {
 
 func printHelp(fs *flag.FlagSet) func() {
 	return func() {
-		fmt.Fprintf(os.Stderr, `mycontext - Context aggregator for LLM prompts
+		fmt.Fprintf(os.Stderr, `context - Context aggregator for LLM prompts
 
 USAGE:
-  mycontext [options] [extensions...]
+  context [options] [extensions...]
 
 MODES (select one):
   <extensions...>          Scan directory for specific extensions (e.g. .go .ts)

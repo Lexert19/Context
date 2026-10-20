@@ -1,11 +1,8 @@
 package output
 
 import (
-	"encoding/json"
-	"math"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"unicode"
 
@@ -73,63 +70,6 @@ func BuildWordIndexProto(filePaths []string, targetPath string) error {
 	}
 	_ = os.MkdirAll(filepath.Dir(targetPath), 0755)
 	return os.WriteFile(targetPath, data, 0644)
-}
-
-func BuildWordIndex(filePaths []string, targetPath string) error {
-	index := make(map[string]FileIndexJSON)
-
-	for _, path := range filePaths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-
-		tokens := tokenize(string(content))
-		total := len(tokens)
-		if total == 0 {
-			continue
-		}
-
-		counts := make(map[string]int)
-		for _, token := range tokens {
-			counts[token]++
-		}
-
-		var stats []WordStat
-		for word, count := range counts {
-			weight := math.Round((float64(count)/float64(total))*10000) / 10000
-			stats = append(stats, WordStat{
-				Word:   word,
-				Count:  count,
-				Weight: weight,
-			})
-		}
-
-		sort.Slice(stats, func(i, j int) bool {
-			if stats[i].Count == stats[j].Count {
-				return stats[i].Word < stats[j].Word
-			}
-			return stats[i].Count > stats[j].Count
-		})
-
-		normalizedPath := filepath.ToSlash(path)
-		index[normalizedPath] = FileIndexJSON{
-			TotalTokens:  total,
-			UniqueTokens: len(stats),
-			Words:        stats,
-		}
-	}
-
-	_ = os.MkdirAll(filepath.Dir(targetPath), 0755)
-	f, err := os.Create(targetPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	return enc.Encode(index)
 }
 
 func tokenize(content string) []string {
