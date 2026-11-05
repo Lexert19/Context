@@ -71,7 +71,7 @@ func main() {
 	}
 
 	if cfg.IndexWords {
-		targetIndex := filepath.Join(".idea", "word_index.json")
+		targetIndex := filepath.Join(".idea", "word_index.pb")
 		if err := output.BuildWordIndexProto(processed, targetIndex); err != nil {
 			fmt.Fprintf(os.Stderr, "Error building word index: %v\n", err)
 		} else {

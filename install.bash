@@ -1,1 +1,1 @@
-go build -o /home/lexert/bin/context ./cmd/context
+mkdir -p ~/bin && go build -o ~/bin/context ./cmd/context
